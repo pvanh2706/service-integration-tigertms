@@ -283,7 +283,7 @@ Service log cac moc quan trong:
 - Duplicate event
 - Done -> ACK
 
-Serilog Elasticsearch index format: `<IndexPrefix>-yyyy.MM.dd`.
+Serilog Elasticsearch index format: `<IndexPrefix>`.
 
 ## 12. Do tin cay va han che hien tai
 

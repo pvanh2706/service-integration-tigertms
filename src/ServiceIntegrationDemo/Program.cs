@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Sinks.Elasticsearch;
@@ -21,15 +21,22 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, lc) =>
 {
     var elastic = ctx.Configuration.GetSection("Elastic").Get<ElasticOptions>() ?? new ElasticOptions();
-    lc.Enrich.FromLogContext()
+    // lc.Enrich.FromLogContext()
+    // Bỏ MinimumLevel.Verbose() để giảm log chi tiết, chỉ còn Information trở lên
+    lc.MinimumLevel.Information()
+      .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+      .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+      .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning)
+      .Enrich.FromLogContext()
       .WriteTo.Console();
+    // Kết thúc bỏ MinimumLevel.Verbose() để giảm log chi tiết, chỉ còn Information trở lên
 
     if (elastic.Enabled && Uri.TryCreate(elastic.Uri, UriKind.Absolute, out var uri))
     {
         lc.WriteTo.Elasticsearch(new ElasticsearchSinkOptions(uri)
         {
             AutoRegisterTemplate = true,
-            IndexFormat = $"{elastic.IndexPrefix}-{{0:yyyy.MM.dd}}"
+            IndexFormat = $"{elastic.IndexPrefix}"
         });
     }
 });
@@ -130,3 +137,4 @@ app.MapPost("/events/checkin", async (
 .WithName("CheckIn");
 
 app.Run();
+
