@@ -1,7 +1,7 @@
-﻿# ServiceIntegrationTigerTMS - Project Architecture Guide
+﻿# ServiceIntegration.TigerTMS - Project Architecture Guide
 
 Tai lieu nay duoc viet de lan sau chi can nhin cau truc project la co the hieu nhanh he thong va xu ly task.
-Pham vi: toan bo source trong `src/ServiceIntegrationDemo` + tai lieu `README*.md`, `Cautruc.md`, `case-test-loi.md`, `scripts/rabbitmq-topology.md`.
+Pham vi: toan bo source trong `src/ServiceIntegration` (folder tren disk con la `ServiceIntegrationDemo` - can doi tay sau khi tat VS Code) + tai lieu `README*.md`, `Cautruc.md`, `case-test-loi.md`, `scripts/rabbitmq-topology.md`.
 
 ## 1. Muc tieu du an
 
@@ -22,17 +22,17 @@ Service duoc thiet ke theo huong at-least-once processing (khong phai exactly-on
 - Logging: Serilog + Console + Elasticsearch sink
 - API docs: Swagger (Swashbuckle)
 
-File xac nhan: `src/ServiceIntegrationDemo/ServiceIntegrationDemo.csproj`.
+File xac nhan: `src/ServiceIntegrationDemo/ServiceIntegration.csproj` (da doi ten khoi Demo).
 
 ## 3. Cau truc thu muc
 
 ```text
-src/ServiceIntegrationDemo
+src/ServiceIntegration          <- csproj: ServiceIntegration.csproj
 |- Program.cs
 |- appsettings.json
 |- GlobalUsings.cs
 |- Core
-|  |- Abstractions
+|  |- Abstractions              <- namespace: ServiceIntegration.Core.Abstractions
 |  |  |- IEventHandler.cs
 |  |  |- IIdempotencyStore.cs
 |  |  |- IIntegrationQueue.cs
@@ -40,31 +40,34 @@ src/ServiceIntegrationDemo
 |  |  |- IQueueConsumer.cs
 |  |  |- ITigerClient.cs
 |  |  `- MessageHeaders.cs
-|  |- Contracts
+|  |- Contracts                 <- namespace: ServiceIntegration.Core.Contracts
 |  |  |- EventEnvelope.cs
 |  |  `- CheckInPayload.cs
-|  `- Services
+|  `- Services                  <- namespace: ServiceIntegration.Core.Services
 |     |- EventHandlerRegistry.cs
 |     |- MessageOrchestrator.cs
 |     |- RetryRouter.cs
 |     `- CheckInEventHandler.cs
 `- Infrastructure
-   |- Options.cs
-   |- MemoryIdempotencyStore.cs
-   |- Pms
+   |- Configuration             <- namespace: ServiceIntegration.Infrastructure.Configuration
+   |  `- Options.cs             <- (RabbitOptions, TigerOptions, PmsCallbackOptions, ElasticOptions)
+   |- Idempotency               <- namespace: ServiceIntegration.Infrastructure.Idempotency
+   |  `- MemoryIdempotencyStore.cs
+   |- Pms                       <- namespace: ServiceIntegration.Infrastructure.Pms
    |  `- PmsCallbackClient.cs
-   |- RabbitMq
+   |- RabbitMq                  <- namespace: ServiceIntegration.Infrastructure.RabbitMq
    |  |- RabbitConnectionFactory.cs
    |  |- RabbitTopology.cs
    |  |- RabbitPublisher.cs
-   |  |- RabbitPublisher copy.cs (legacy/commented)
    |  `- RabbitConsumer.cs
-   |- Tiger
+   |- TigerTms                  <- namespace: ServiceIntegration.Infrastructure.TigerTms
    |  |- TigerSoapBuilder.cs
    |  `- TigerClient.cs
-   `- Worker
+   `- Workers                   <- namespace: ServiceIntegration.Infrastructure.Workers
       `- QueueWorker.cs
 ```
+
+Luu y: folder tren disk van la `ServiceIntegrationDemo` (can doi tay sau khi tat VS Code vi bi file lock). Ten csproj da doi thanh `ServiceIntegration.csproj`.
 
 Ngoai source:
 - `README.md`: huong dan chay nhanh local.
@@ -257,7 +260,7 @@ Quan trong: code hien tai KHONG tao cac retry TTL queues nay. Can tao san bang s
 
 ## 10. Cau hinh appsettings (default hien tai)
 
-File: `src/ServiceIntegrationDemo/appsettings.json`.
+File: `src/ServiceIntegrationDemo/appsettings.json` (folder disk chua doi ten).
 
 Section chinh:
 - `Kestrel.Endpoints.Http.Url`: `http://0.0.0.0:5080`
@@ -313,7 +316,7 @@ Serilog Elasticsearch index format: `<IndexPrefix>`.
 - Thuc te thuong callback qua he thong PMS ben ngoai.
 
 6. File `RabbitPublisher copy.cs` la file backup/commented:
-- Nen xoa de tranh nham lan.
+- **Da duoc xoa**. Neu con ton tai trong repo, nen xoa de tranh nham lan.
 
 7. Chuoi log tieng Viet dang bi loi encoding o mot vai message.
 
@@ -360,7 +363,7 @@ Neu nguoi moi vao du an, nen doc theo thu tu:
 2. `Core/Services/MessageOrchestrator.cs`
 3. `Core/Services/CheckInEventHandler.cs`
 4. `Infrastructure/RabbitMq/*`
-5. `Infrastructure/Tiger/*`
+5. `Infrastructure/TigerTms/*`
 6. `Infrastructure/Pms/PmsCallbackClient.cs`
 7. `appsettings.json`
 8. `scripts/rabbitmq-topology.md`
