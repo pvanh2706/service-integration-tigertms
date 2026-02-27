@@ -40,6 +40,8 @@ public sealed class ElasticOptions
     public bool Enabled { get; set; } = false;
     public string Uri { get; set; } = "http://localhost:9200";
     public string IndexPrefix { get; set; } = "ServiceIntegration";
+    /// <summary>Tuỳ chọn - dùng làm field 'type' trong document nếu cần.</summary>
+    public string Type { get; set; } = "logging";
 }
 
 public sealed class TigerOptions

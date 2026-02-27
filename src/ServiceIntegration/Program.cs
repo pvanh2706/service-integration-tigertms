@@ -1,45 +1,31 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Serilog;
-using Serilog.Sinks.Elasticsearch;
 using ServiceIntegration.Core.Abstractions;
-using ServiceIntegration.Core.Contracts;
 using ServiceIntegration.Core.Services;
 using ServiceIntegration.Infrastructure.Configuration;
+using ServiceIntegration.Infrastructure.Elastic;
 using ServiceIntegration.Infrastructure.Idempotency;
 using ServiceIntegration.Infrastructure.Pms;
 using ServiceIntegration.Infrastructure.RabbitMq;
 using ServiceIntegration.Infrastructure.TigerTms;
 using ServiceIntegration.Infrastructure.Workers;
-using System.Text;
-using System.Text.Json;
+using ServiceIntegration.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Windows Service ready:
 // builder.Host.UseWindowsService();
 
+// Serilog: chỉ ghi ra Console.
+// Log lên Elasticsearch được thực hiện chủ động qua IElasticLogger (không tự động).
 builder.Host.UseSerilog((ctx, lc) =>
 {
-    var elastic = ctx.Configuration.GetSection("Elastic").Get<ElasticOptions>() ?? new ElasticOptions();
-    // lc.Enrich.FromLogContext()
-    // Bỏ MinimumLevel.Verbose() để giảm log chi tiết, chỉ còn Information trở lên
     lc.MinimumLevel.Information()
       .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
       .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
       .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning)
       .Enrich.FromLogContext()
       .WriteTo.Console();
-    // Kết thúc bỏ MinimumLevel.Verbose() để giảm log chi tiết, chỉ còn Information trở lên
-
-    if (elastic.Enabled && Uri.TryCreate(elastic.Uri, UriKind.Absolute, out var uri))
-    {
-        lc.WriteTo.Elasticsearch(new ElasticsearchSinkOptions(uri)
-        {
-            AutoRegisterTemplate = true,
-            IndexFormat = $"{elastic.IndexPrefix}"
-        });
-    }
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -64,11 +50,21 @@ builder.Services.AddHttpClient("PmsCallback", (sp, client) =>
     client.Timeout = TimeSpan.FromSeconds(Math.Max(3, opt.TimeoutSeconds));
 });
 
+// HttpClient riêng cho ElasticLogger (không bị cắt timeout ngắn như TigerTms)
+builder.Services.AddHttpClient("Elastic", (sp, client) =>
+{
+    var opt = sp.GetRequiredService<IOptions<ElasticOptions>>().Value;
+    client.BaseAddress = Uri.TryCreate(opt.Uri, UriKind.Absolute, out var uri) ? uri : null;
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+
 builder.Services.AddSingleton<RabbitConnectionFactory>();
 builder.Services.AddSingleton<RabbitTopology>();
 builder.Services.AddSingleton<RabbitPublisher>();
 builder.Services.AddSingleton<IIntegrationQueue>(sp => sp.GetRequiredService<RabbitPublisher>());
 builder.Services.AddSingleton<IQueueConsumer, RabbitConsumer>();
+
+builder.Services.AddSingleton<IElasticLogger, ElasticLogger>();
 
 builder.Services.AddSingleton<ITigerClient, TigerClient>();
 builder.Services.AddSingleton<IPmsCallbackClient, PmsCallbackClient>();
@@ -97,45 +93,8 @@ catch (Exception ex)
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.MapGet("/health", () => Results.Ok(new { ok = true }));
-
-// Demo endpoint: PMS callback
-app.MapPost("/pms/callback", ([FromBody] PmsCallbackRequest req) =>
-{
-    return Results.Ok(new { ok = true, req.EventId, req.TigerStatus });
-});
-
-// Receive CHECKIN event (PMS -> Integration)
-app.MapPost("/events/checkin", async (
-    [FromBody] EventEnvelope envelope,
-    IIntegrationQueue queue,
-    IOptions<TigerOptions> tigerOpt) =>
-{
-    if (string.IsNullOrWhiteSpace(envelope.HotelId)) return Results.BadRequest("hotelId is required");
-    if (string.IsNullOrWhiteSpace(envelope.EventId)) return Results.BadRequest("eventId is required");
-
-    envelope.EventType = "CHECKIN";
-
-    // Enqueue only payload bytes (handlers parse payload)
-    var payloadJson = JsonSerializer.Serialize(envelope.Payload);
-    var body = Encoding.UTF8.GetBytes(payloadJson);
-
-    var headers = new MessageHeaders();
-    headers.Set("x-hotel-id", envelope.HotelId);
-    headers.Set("x-event-id", envelope.EventId);
-    headers.Set("x-event-type", envelope.EventType);
-    headers.Set("x-correlation-id", Guid.NewGuid().ToString("N"));
-    headers.Set("x-attempt", 0);
-
-    // Demo: use global wsuserkey from config; production: load by HotelId (DB/config service)
-    var wsuserkey = tigerOpt.Value.WsUserKey;
-    if (!string.IsNullOrWhiteSpace(wsuserkey))
-        headers.Set("x-wsuserkey", wsuserkey);
-
-    await queue.PublishAsync(body, headers, CancellationToken.None);
-    return Results.Ok(new { status = "QUEUED", envelope.EventId, envelope.HotelId });
-})
-.WithName("CheckIn");
+app.MapPmsEndpoints();
+app.MapCheckInEndpoints();
 
 app.Run();
 
