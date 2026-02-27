@@ -1,15 +1,7 @@
-﻿using Microsoft.Extensions.Options;
-using Serilog;
-using ServiceIntegration.Core.Abstractions;
-using ServiceIntegration.Core.Services;
-using ServiceIntegration.Infrastructure.Configuration;
-using ServiceIntegration.Infrastructure.Elastic;
-using ServiceIntegration.Infrastructure.Idempotency;
-using ServiceIntegration.Infrastructure.Pms;
-using ServiceIntegration.Infrastructure.RabbitMq;
-using ServiceIntegration.Infrastructure.TigerTms;
-using ServiceIntegration.Infrastructure.Workers;
+﻿using Serilog;
 using ServiceIntegration.Endpoints;
+using ServiceIntegration.Extensions;
+using ServiceIntegration.Infrastructure.RabbitMq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,52 +22,16 @@ builder.Host.UseSerilog((ctx, lc) =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-builder.Services.Configure<RabbitOptions>(builder.Configuration.GetSection("RabbitMq"));
-builder.Services.Configure<TigerOptions>(builder.Configuration.GetSection("TigerTms"));
-builder.Services.Configure<PmsCallbackOptions>(builder.Configuration.GetSection("PmsCallback"));
-builder.Services.Configure<RetryPolicyOptions>(builder.Configuration.GetSection("RetryPolicy"));
-
 builder.Services.AddMemoryCache();
 
-builder.Services.AddHttpClient("TigerTms", (sp, client) =>
-{
-    var opt = sp.GetRequiredService<IOptions<TigerOptions>>().Value;
-    client.Timeout = TimeSpan.FromSeconds(Math.Max(3, opt.TimeoutSeconds));
-});
-
-builder.Services.AddHttpClient("PmsCallback", (sp, client) =>
-{
-    var opt = sp.GetRequiredService<IOptions<PmsCallbackOptions>>().Value;
-    client.Timeout = TimeSpan.FromSeconds(Math.Max(3, opt.TimeoutSeconds));
-});
-
-// HttpClient riêng cho ElasticLogger (không bị cắt timeout ngắn như TigerTms)
-builder.Services.AddHttpClient("Elastic", (sp, client) =>
-{
-    var opt = sp.GetRequiredService<IOptions<ElasticOptions>>().Value;
-    client.BaseAddress = Uri.TryCreate(opt.Uri, UriKind.Absolute, out var uri) ? uri : null;
-    client.Timeout = TimeSpan.FromSeconds(5);
-});
-
-builder.Services.AddSingleton<RabbitConnectionFactory>();
-builder.Services.AddSingleton<RabbitTopology>();
-builder.Services.AddSingleton<RabbitPublisher>();
-builder.Services.AddSingleton<IIntegrationQueue>(sp => sp.GetRequiredService<RabbitPublisher>());
-builder.Services.AddSingleton<IQueueConsumer, RabbitConsumer>();
-
-builder.Services.AddSingleton<IElasticLogger, ElasticLogger>();
-
-builder.Services.AddSingleton<ITigerClient, TigerClient>();
-builder.Services.AddSingleton<IPmsCallbackClient, PmsCallbackClient>();
-builder.Services.AddSingleton<IIdempotencyStore, MemoryIdempotencyStore>();
-
-builder.Services.AddSingleton<RetryRouter>();
-builder.Services.AddSingleton<IEventHandler, CheckInEventHandler>();
-builder.Services.AddSingleton<EventHandlerRegistry>();
-builder.Services.AddSingleton<MessageOrchestrator>();
-
-builder.Services.AddHostedService<QueueWorker>();
+// Đăng ký Options từ appsettings.
+builder.Services.AddAppOptions(builder.Configuration);
+// Đăng ký HttpClient cho từng external service.
+builder.Services.AddAppHttpClients();
+// Đăng ký các thành phần Infrastructure (RabbitMQ, Tiger, PMS, Elastic, Idempotency).
+builder.Services.AddAppInfrastructure();
+// Đăng ký các service chính của ứng dụng (IntegrationService, Workers).
+builder.Services.AddAppServices();
 
 var app = builder.Build();
 
@@ -93,6 +49,7 @@ catch (Exception ex)
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Map endpoints trước để có thể truy cập ngay cả khi RabbitMQ chưa sẵn sàng (không phụ thuộc vào RabbitMQ)
 app.MapPmsEndpoints();
 app.MapCheckInEndpoints();
 

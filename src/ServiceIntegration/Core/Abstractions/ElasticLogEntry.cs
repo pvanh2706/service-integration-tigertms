@@ -49,7 +49,14 @@ public sealed class ElasticLogEntry
     public string Service { get; } = "ServiceIntegration.TigerTMS";
 
     // ── Common event fields ──────────────────────────────────────────
-
+    /// <summary>
+    /// Mã khách sạn - có thể dùng để phân sharding index, filter log theo hotel, v.v.
+    /// Nên có trong mọi log liên quan đến event để tiện filter/trace khi debugging.
+    /// Nếu có nhiều event liên quan đến cùng một hotelId/eventId thì sẽ dễ dàng trace theo hotelId/eventId/correlationId. Nếu thiếu hotelId thì việc trace sẽ khó khăn hơn nhiều (phải dựa vào correlationId nếu có, hoặc phải dò theo eventId nhưng có thể không unique). Do đó, tốt nhất là nên có hotelId trong mọi log liên quan đến event processing, kể cả log lỗi (nếu có thể lấy được hotelId). Nếu không có hotelId thì ít nhất cũng nên có eventId để trace theo eventId, nhưng sẽ khó hơn nếu có nhiều event cùng eventId. CorrelationId thì tùy client gửi vào thế nào, không đảm bảo có mặt trong mọi log.
+    /// Nếu log liên quan đến một event cụ thể thì nên có hotelId/eventId/correlationId để dễ trace. Nếu log không liên quan đến event nào cụ thể (ví dụ lỗi chung của service) thì có thể không cần hotelId/eventId nhưng vẫn nên có correlationId nếu có thể lấy được, để trace theo correlationId nếu client gửi vào.
+    /// Được set qua SetHotelId() để đảm bảo không bị bỏ trống, tránh log thiếu hotelId
+    /// Ánh xạ field name trong ES qua [JsonPropertyName] để không phụ thuộc tên biến trong code, dễ refactor.
+    /// </summary>
     [JsonPropertyName("hotelId")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? HotelId { get; private set; }
@@ -85,6 +92,10 @@ public sealed class ElasticLogEntry
     [JsonPropertyName("started_at")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? StartedAt { get; private set; }
+
+    [JsonPropertyName("end_at")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EndAt { get; private set; }
 
     [JsonPropertyName("duration_ms")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -141,8 +152,9 @@ public sealed class ElasticLogEntry
 
     public ElasticLogEntry SetDuration(DateTimeOffset startedAt, long elapsedMs)
     {
-        StartedAt  = startedAt.ToString("o");
+        StartedAt  = startedAt.ToString("o"); // ISO 8601 format
         DurationMs = elapsedMs;
+        EndAt = DateTimeOffset.UtcNow.ToString("o"); // ISO 8601 format
         return this;
     }
 

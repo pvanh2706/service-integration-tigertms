@@ -40,7 +40,8 @@ public sealed class ElasticLogger : IElasticLogger
         try
         {
             var indexDate = DateTimeOffset.UtcNow.ToString("yyyy.MM.dd");
-            var index     = $"{_options.IndexPrefix}-{indexDate}";
+            // var index     = $"{_options.IndexPrefix}-{indexDate}";
+            var index     = $"{_options.IndexPrefix}";
             var json      = JsonSerializer.Serialize(entry, _json);
             var content   = new StringContent(json, Encoding.UTF8, "application/json");
 

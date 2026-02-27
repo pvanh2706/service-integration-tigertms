@@ -24,7 +24,7 @@ public static class CheckInEndpoints
             if (string.IsNullOrWhiteSpace(envelope.EventId)) return Results.BadRequest("eventId is required");
 
             envelope.EventType = "CHECKIN";
-            var correlationId = Guid.NewGuid().ToString("N");
+            var correlationId = Guid.NewGuid().ToString("N"); // Generate a new correlationId for this request; in production, client có thể gửi kèm correlationId riêng
 
             // Log ingress — scoped entry cho request này
             var log = new ElasticLogEntry(elastic)
