@@ -128,11 +128,8 @@ public sealed class RabbitPublisher : IIntegrationQueue, IDisposable
 
     public string RoutingKeyForRetry(Core.Services.RetryRoute route) => route switch
     {
-        Core.Services.RetryRoute.Retry10s => _opt.RoutingKeys.Retry10s,
-        Core.Services.RetryRoute.Retry1m => _opt.RoutingKeys.Retry1m,
-        Core.Services.RetryRoute.Retry5m => _opt.RoutingKeys.Retry5m,
-        Core.Services.RetryRoute.Retry30m => _opt.RoutingKeys.Retry30m,
-        _ => _opt.RoutingKeys.Dead
+        Core.Services.RetryRoute.Retry => _opt.RoutingKeys.Retry,
+        _                              => _opt.RoutingKeys.Dead
     };
 
     public void Dispose()

@@ -53,8 +53,8 @@ public static class CheckInEndpoints
 
             try
             {
+                await log.SetAction("CHECKIN_QUEUED").InfoAsync("Đang đưa vào queue...");
                 await queue.PublishAsync(body, headers, CancellationToken.None);
-                await log.SetAction("CHECKIN_QUEUED").InfoAsync("Đã đưa vào queue thành công");
             }
             catch (Exception ex)
             {

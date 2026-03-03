@@ -21,17 +21,15 @@ public sealed class RabbitOptions
     public sealed class QueueOptions
     {
         public string Events { get; set; } = "tigertms.events.q";
-        public string Dead { get; set; } = "tigertms.dead.q";
+        public string Retry  { get; set; } = "tigertms.retry.q";
+        public string Dead   { get; set; } = "tigertms.dead.q";
     }
 
     public sealed class RoutingKeyOptions
     {
         public string Events { get; set; } = "events";
-        public string Retry10s { get; set; } = "retry.10s";
-        public string Retry1m { get; set; } = "retry.1m";
-        public string Retry5m { get; set; } = "retry.5m";
-        public string Retry30m { get; set; } = "retry.30m";
-        public string Dead { get; set; } = "dead";
+        public string Retry  { get; set; } = "retry";
+        public string Dead   { get; set; } = "dead";
     }
 }
 

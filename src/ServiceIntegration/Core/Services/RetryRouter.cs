@@ -11,23 +11,30 @@ public sealed class RetryRouter
         _opt = opt.Value;
     }
 
+    /// <summary>
+    /// attempt = số lần đã thử (0-based).
+    /// Nếu đã đủ MaxAttempts thì chuyển Dead, ngược lại retry với interval cố định.
+    /// </summary>
     public RetryDecision Decide(int attempt)
     {
-        if (attempt <= 0) return new RetryDecision(RetryRoute.Retry10s);
-        if (attempt == 1) return new RetryDecision(RetryRoute.Retry1m);
-        if (attempt == 2) return new RetryDecision(RetryRoute.Retry5m);
-        if (attempt == 3) return new RetryDecision(RetryRoute.Retry30m);
-        return new RetryDecision(RetryRoute.Dead);
+        if (attempt >= _opt.MaxAttempts - 1)
+            return new RetryDecision(RetryRoute.Dead);
+
+        return new RetryDecision(RetryRoute.Retry);
     }
 
     public int MaxAttempts => _opt.MaxAttempts;
 }
 
-public enum RetryRoute { Retry10s, Retry1m, Retry5m, Retry30m, Dead }
+public enum RetryRoute { Retry, Dead }
 
 public sealed record RetryDecision(RetryRoute Route);
 
 public sealed class RetryPolicyOptions
 {
-    public int MaxAttempts { get; set; } = 5;
+    /// <summary>Số lần retry tối đa trước khi chuyển Dead.</summary>
+    public int MaxAttempts { get; set; } = 3;
+
+    /// <summary>Khoảng thời gian giữa mỗi lần retry (giây).</summary>
+    public int IntervalSeconds { get; set; } = 20;
 }
